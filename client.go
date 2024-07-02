@@ -31,6 +31,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/pexip/go-openssl"
 	"golang.org/x/net/http2"
 	"golang.org/x/oauth2"
 	"gopkg.in/h2non/gock.v1"
@@ -38,12 +39,23 @@ import (
 
 var (
 	innerHTTP2Client = &http.Client{
-		Transport: &http2.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
+        	Transport: &http2.Transport{
+            		DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
+                		ctx, err := openssl.NewCtx()
+                		if err != nil {
+                    			return nil, err
+                		}
+                		ctx.SetVerifyMode(openssl.VerifyNone)
+                
+                		conn, err := openssl.Dial("tcp", addr, ctx, 0)
+                		if err != nil {
+                    			return nil, err
+                		}
+                
+                		return conn, nil
+            		},
+        	},
+    	}
 
 	innerHTTP2CleartextClient = &http.Client{
 		Transport: &http2.Transport{
