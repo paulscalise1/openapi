@@ -17,7 +17,7 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/pkg/errors"
 
-	"github.com/free5gc/openapi/models"
+	"github.com/paulscalise1/openapi/models"
 )
 
 type CCAClaims struct {

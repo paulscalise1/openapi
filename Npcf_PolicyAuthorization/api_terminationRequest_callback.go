@@ -16,8 +16,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/free5gc/openapi"
-	"github.com/free5gc/openapi/models"
+	"github.com/paulscalise1/openapi"
+	"github.com/paulscalise1/openapi/models"
 )
 
 type PolicyAuthorizationTerminateRequestApiService service
