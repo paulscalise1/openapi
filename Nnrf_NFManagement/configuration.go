@@ -10,6 +10,7 @@
 package Nnrf_NFManagement
 
 import (
+	"crypto/tls"
 	"net/http"
 	"strings"
 )
@@ -24,11 +25,16 @@ type Configuration struct {
 }
 
 func NewConfiguration() *Configuration {
+	tr := &http.Transport{
+		TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
+	}
+
 	cfg := &Configuration{
 		basePath:      "https://example.com/nnrf-nfm/v1",
 		url:           "{apiRoot}/nnrf-nfm/v1",
 		defaultHeader: make(map[string]string),
 		userAgent:     "OpenAPI-Generator/1.0.0/go",
+		httpClient:    &http.Client{Transport: tr},
 	}
 	return cfg
 }
