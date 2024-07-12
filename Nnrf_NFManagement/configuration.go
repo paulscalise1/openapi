@@ -46,21 +46,20 @@ func NewConfiguration() *Configuration {
 
 	cfg.tlsCtx.SetVerify(openssl.VerifyNone, nil)
 
-	if err := cfg.tlsCtx.SetNextProtos([]string{"http/1.1"}); err != nil {
-		fmt.Println("Failed to set Next Protos (ALPN)")
-		return nil
-	}
+	//if err := cfg.tlsCtx.SetNextProtos([]string{"http/1.1"}); err != nil {
+	//	fmt.Println("Failed to set Next Protos (ALPN)")
+	//	return nil
+	//}
 
 	// Custom dial function to use OpenSSL for TLS connections
 	dialTLS := func(network, addr string) (net.Conn, error) {
-		fmt.Println("\n\n")
 		fmt.Println(addr)
 		fmt.Println("\n")
 		fmt.Println(network)
 		fmt.Println("\n")
-		conn, err := openssl.Dial("tcp", addr, cfg.tlsCtx, 0)
+		conn, err := openssl.Dial(network, addr, cfg.tlsCtx, 0)
 		if err != nil {
-			fmt.Println("failed to establish TLS connection")
+			fmt.Printf("Failed to establish TLS connection: %v\n", err)
 			return nil, nil
 		}
 		return conn, nil
