@@ -56,6 +56,8 @@ func NewConfiguration() *Configuration {
 		fmt.Println("\n\n")
 		fmt.Println(addr)
 		fmt.Println("\n")
+		fmt.Println(network)
+		fmt.Println("\n")
 		conn, err := openssl.Dial("tcp", addr, cfg.tlsCtx, 0)
 		if err != nil {
 			fmt.Println("failed to establish TLS connection")
