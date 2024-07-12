@@ -54,7 +54,7 @@ func NewConfiguration() *Configuration {
 	// Custom dial function to use OpenSSL for TLS connections
 	dialTLS := func(network, addr string) (net.Conn, error) {
 		cfg.tlsCtx.SetVerify(openssl.VerifyNone, nil)
-		conn, err := openssl.Dial(network, addr, cfg.tlsCtx, 0)
+		conn, err := openssl.Dial(network, addr, cfg.tlsCtx, openssl.InsecureSkipHostVerification)
 		if err != nil {
 			fmt.Printf("Failed to establish TLS connection: %v\n", err)
 			return nil, nil
