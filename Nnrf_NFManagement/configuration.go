@@ -27,6 +27,9 @@ type Configuration struct {
 func NewConfiguration() *Configuration {
 	tr := &http.Transport{
 		TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // Skip certificate verification
+		},
 	}
 
 	cfg := &Configuration{
