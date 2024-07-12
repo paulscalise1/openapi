@@ -11,6 +11,7 @@ package Nnrf_NFManagement
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -51,12 +52,14 @@ func NewConfiguration() *Configuration {
 	//	return nil
 	//}
 
+	cfg.tlsCtx.SetVerify(openssl.VerifyPeer, func(ok bool, store *openssl.CertificateStoreCtx) bool {
+		// Perform any custom verification logic here if needed
+		// For now, just skip hostname verification by returning true
+		return true
+	})
+
 	// Custom dial function to use OpenSSL for TLS connections
 	dialTLS := func(network, addr string) (net.Conn, error) {
-		fmt.Println(addr)
-		fmt.Println("\n")
-		fmt.Println(network)
-		fmt.Println("\n")
 		cfg.tlsCtx.SetVerify(openssl.VerifyNone, nil)
 		conn, err := openssl.Dial(network, addr, cfg.tlsCtx, 0)
 		if err != nil {
@@ -70,6 +73,10 @@ func NewConfiguration() *Configuration {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true, // Skip certificate verification
+			VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
+				// Skip hostname verification
+				return nil
+			},
 		},
 		TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
 		DialTLS:      dialTLS,
