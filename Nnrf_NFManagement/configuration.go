@@ -11,7 +11,6 @@ package Nnrf_NFManagement
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -39,7 +38,7 @@ func NewConfiguration() *Configuration {
 	}
 
 	var err error
-	cfg.tlsCtx, err = openssl.NewCtxFromFiles("cert/nrf.pem", "cert/nrf.key")
+	cfg.tlsCtx, err = openssl.NewCtxFromFiles("cert/amf.pem", "cert/amf.key")
 	if err != nil {
 		fmt.Println("could not set openssl ctx")
 		return nil
@@ -51,12 +50,6 @@ func NewConfiguration() *Configuration {
 	//	fmt.Println("Failed to set Next Protos (ALPN)")
 	//	return nil
 	//}
-
-	cfg.tlsCtx.SetVerify(openssl.VerifyPeer, func(ok bool, store *openssl.CertificateStoreCtx) bool {
-		// Perform any custom verification logic here if needed
-		// For now, just skip hostname verification by returning true
-		return true
-	})
 
 	// Custom dial function to use OpenSSL for TLS connections
 	dialTLS := func(network, addr string) (net.Conn, error) {
@@ -72,11 +65,7 @@ func NewConfiguration() *Configuration {
 	// Create a custom transport using the custom dial function
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, // Skip certificate verification
-			VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-				// Skip hostname verification
-				return nil
-			},
+			InsecureSkipVerify: true, // Skip certificate verification,
 		},
 		TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
 		DialTLS:      dialTLS,
