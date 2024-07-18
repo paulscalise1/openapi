@@ -245,7 +245,7 @@ func CallAPI(cfg Configuration, request *http.Request) (*http.Response, error) {
 	fmt.Println(GetCurrentNetworkFunctionUsingAPI())
 
 	opensslCtx := CreateOpenSSLClientCtx(GetCurrentNetworkFunctionUsingAPI())
-	if opensslCtx != nil {
+	if opensslCtx == nil {
 		return nil, fmt.Errorf("Error Creating OpenSSL Context")
 	}
 
