@@ -144,30 +144,34 @@ func GetCurrentNetworkFunctionUsingAPI() string {
 
 	// Capture the stack trace as a string
 	var trace = buf.String()
+	traceLines := strings.Split(trace, "\n")
 
-	// Define a regular expression pattern to match the desired line
-	pattern := `/go/src/free5gc/NFs/([^/]+)/cmd/main:\d+`
+	// Regular expressions
+	pathPattern := regexp.MustCompile(`/go/src/free5gc/NFs/[^/]+/cmd/main`)
+	nfPath := regexp.MustCompile(`/go/src/free5gc/NFs/([^/]+)/cmd/main`)
 
-	// Compile the regular expression
-	re := regexp.MustCompile(pattern)
-
-	// Find the first match in the stack trace
-	match := re.FindStringSubmatch(trace)
-
-	// Check if there was a match and return the captured group
-	if len(match) > 1 {
-		return match[1] // The first captured group (XXX)
+	for _, line := range traceLines {
+		isolatedPath := pathPattern.FindString(line)
+		if isolatedPath != "" {
+			//fmt.Println("Isolated path:", isolatedPath)
+			nf := nfPath.FindStringSubmatch(isolatedPath)
+			if len(nf) > 1 {
+				return nf[1]
+			}
+		}
 	}
-
-	// Return empty string if no match found
+	fmt.Println("Couldn't find the specified path or network function")
 	return ""
 }
 
-func CreateOpenSSLClientCtx(cfg Configuration) error {
+func CreateOpenSSLClientCtx(cfg Configuration, nf string) error {
 	var err error
+	cert := "cert/"
+	pem := ".pem"
+	key := ".key"
 	var opensslContext *openssl.Ctx
 
-	opensslContext, err = openssl.NewCtxFromFiles("cert/amf.pem", "cert/amf.key")
+	opensslContext, err = openssl.NewCtxFromFiles(cert+nf+pem, cert+nf+key)
 	if err != nil {
 		return fmt.Errorf("could not set openssl ctx")
 	}
@@ -212,10 +216,12 @@ func CallAPI(cfg Configuration, request *http.Request) (*http.Response, error) {
 	//buf.Write(debug.Stack())
 	//var trace = buf.String()
 
+	fmt.Println("***")
 	fmt.Println(GetCurrentNetworkFunctionUsingAPI())
+	fmt.Println("**")
 
 	if cfg.HTTPClient() != nil {
-		if CreateOpenSSLClientCtx(cfg) != nil {
+		if CreateOpenSSLClientCtx(cfg, GetCurrentNetworkFunctionUsingAPI()) != nil {
 			return nil, fmt.Errorf("Error Creating OpenSSL Context in CallAPI()")
 		} else {
 			fmt.Println("using opensslctx")
