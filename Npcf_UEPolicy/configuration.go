@@ -12,6 +12,8 @@ package Npcf_UEPolicy
 import (
 	"net/http"
 	"strings"
+
+	"github.com/pexip/go-openssl"
 )
 
 // contextKeys are used to identify the type of value in the context.
@@ -58,6 +60,7 @@ type Configuration struct {
 	defaultHeader map[string]string
 	userAgent     string
 	httpClient    *http.Client
+	tlsCtx        *openssl.Ctx
 }
 
 func NewConfiguration() *Configuration {
@@ -109,4 +112,16 @@ func (c *Configuration) AddDefaultHeader(key string, value string) {
 
 func (c *Configuration) HTTPClient() *http.Client {
 	return c.httpClient
+}
+
+func (c *Configuration) SetHTTPClient(customClient *http.Client) {
+	c.httpClient = customClient
+}
+
+func (c *Configuration) SetOpenSSLCtx(tlsCtx *openssl.Ctx) {
+	c.tlsCtx = tlsCtx
+}
+
+func (c *Configuration) HTTPClientOpenSSLCtx() *openssl.Ctx {
+	return c.tlsCtx
 }

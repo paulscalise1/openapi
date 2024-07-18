@@ -10,9 +10,6 @@
 package Nnrf_NFManagement
 
 import (
-	"crypto/tls"
-	"fmt"
-	"net"
 	"net/http"
 	"strings"
 
@@ -36,42 +33,6 @@ func NewConfiguration() *Configuration {
 		defaultHeader: make(map[string]string),
 		userAgent:     "OpenAPI-Generator/1.0.0/go",
 	}
-
-	var err error
-	cfg.tlsCtx, err = openssl.NewCtxFromFiles("cert/amf.pem", "cert/amf.key")
-	if err != nil {
-		fmt.Println("could not set openssl ctx")
-		return nil
-	}
-
-	cfg.tlsCtx.SetVerify(openssl.VerifyNone, nil)
-
-	//if err := cfg.tlsCtx.SetNextProtos([]string{"http/1.1"}); err != nil {
-	//	fmt.Println("Failed to set Next Protos (ALPN)")
-	//	return nil
-	//}
-
-	// Custom dial function to use OpenSSL for TLS connections
-	dialTLS := func(network, addr string) (net.Conn, error) {
-		cfg.tlsCtx.SetVerify(openssl.VerifyNone, nil)
-		conn, err := openssl.Dial(network, addr, cfg.tlsCtx, openssl.InsecureSkipHostVerification)
-		if err != nil {
-			fmt.Printf("Failed to establish TLS connection: %v\n", err)
-			return nil, nil
-		}
-		return conn, nil
-	}
-
-	// Create a custom transport using the custom dial function
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, // Skip certificate verification,
-		},
-		TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
-		DialTLS:      dialTLS,
-	}
-
-	cfg.httpClient = &http.Client{Transport: tr}
 
 	return cfg
 }
@@ -119,4 +80,16 @@ func (c *Configuration) AddDefaultHeader(key string, value string) {
 
 func (c *Configuration) HTTPClient() *http.Client {
 	return c.httpClient
+}
+
+func (c *Configuration) SetHTTPClient(customClient *http.Client) {
+	c.httpClient = customClient
+}
+
+func (c *Configuration) SetOpenSSLCtx(tlsCtx *openssl.Ctx) {
+	c.tlsCtx = tlsCtx
+}
+
+func (c *Configuration) HTTPClientOpenSSLCtx() *openssl.Ctx {
+	return c.tlsCtx
 }

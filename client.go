@@ -31,6 +31,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"runtime/debug"
+
+	"github.com/pexip/go-openssl"
 	"golang.org/x/net/http2"
 	"golang.org/x/oauth2"
 	"gopkg.in/h2non/gock.v1"
@@ -68,6 +71,9 @@ type Configuration interface {
 	UserAgent() string
 	DefaultHeader() map[string]string
 	HTTPClient() *http.Client
+	SetHTTPClient(*http.Client)
+	SetOpenSSLCtx(*openssl.Ctx)
+	HTTPClientOpenSSLCtx() *openssl.Ctx
 }
 
 // SelectHeaderAccept join all accept types and return
@@ -131,10 +137,63 @@ func ParameterToString(obj interface{}, collectionFormat string) string {
 	return fmt.Sprintf("%v", obj)
 }
 
+func CreateOpenSSLClientCtx(cfg Configuration) error {
+	var err error
+	var opensslContext *openssl.Ctx
+
+	opensslContext, err = openssl.NewCtxFromFiles("cert/amf.pem", "cert/amf.key")
+	if err != nil {
+		return fmt.Errorf("could not set openssl ctx")
+	}
+
+	opensslContext.SetVerify(openssl.VerifyNone, nil)
+	cfg.SetOpenSSLCtx(opensslContext)
+
+	//if err := cfg.tlsCtx.SetNextProtos([]string{"http/1.1"}); err != nil {
+	//	fmt.Println("Failed to set Next Protos (ALPN)")
+	//	return nil
+	//}
+
+	// Custom dial function to use OpenSSL for TLS connections
+	dialTLS := func(network, addr string) (net.Conn, error) {
+		//cfg.tlsCtx.SetVerify(openssl.VerifyNone, nil)
+		conn, err := openssl.Dial(network, addr, cfg.HTTPClientOpenSSLCtx(), openssl.InsecureSkipHostVerification)
+		if err != nil {
+			fmt.Printf("Failed to establish TLS connection: %v\n", err)
+			return nil, nil
+		}
+		return conn, nil
+	}
+
+	// Create a custom transport using the custom dial function
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // Skip certificate verification,
+		},
+		TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
+		DialTLS:      dialTLS,
+	}
+
+	var customClient = &http.Client{Transport: tr}
+	cfg.SetHTTPClient(customClient)
+
+	return nil
+}
+
 // callAPI do the request.
 func CallAPI(cfg Configuration, request *http.Request) (*http.Response, error) {
+	var buf bytes.Buffer
+	buf.Write(debug.Stack())
+	var trace = buf.String()
+
+	fmt.Print(trace)
+
 	if cfg.HTTPClient() != nil {
-		return cfg.HTTPClient().Do(request)
+		if CreateOpenSSLClientCtx(cfg) != nil {
+			return nil, fmt.Errorf("Error Creating OpenSSL Context in CallAPI()")
+		} else {
+			return cfg.HTTPClient().Do(request)
+		}
 	}
 	if request.URL.Scheme == "https" {
 		return innerHTTP2Client.Do(request)
