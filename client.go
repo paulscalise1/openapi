@@ -26,6 +26,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -137,6 +138,31 @@ func ParameterToString(obj interface{}, collectionFormat string) string {
 	return fmt.Sprintf("%v", obj)
 }
 
+func GetCurrentNetworkFunctionUsingAPI() string {
+	var buf bytes.Buffer
+	buf.Write(debug.Stack())
+
+	// Capture the stack trace as a string
+	var trace = buf.String()
+
+	// Define a regular expression pattern to match the desired line
+	pattern := `/go/src/free5gc/NFs/([^/]+)/cmd/main:\d+`
+
+	// Compile the regular expression
+	re := regexp.MustCompile(pattern)
+
+	// Find the first match in the stack trace
+	match := re.FindStringSubmatch(trace)
+
+	// Check if there was a match and return the captured group
+	if len(match) > 1 {
+		return match[1] // The first captured group (XXX)
+	}
+
+	// Return empty string if no match found
+	return ""
+}
+
 func CreateOpenSSLClientCtx(cfg Configuration) error {
 	var err error
 	var opensslContext *openssl.Ctx
@@ -182,20 +208,22 @@ func CreateOpenSSLClientCtx(cfg Configuration) error {
 
 // callAPI do the request.
 func CallAPI(cfg Configuration, request *http.Request) (*http.Response, error) {
-	var buf bytes.Buffer
-	buf.Write(debug.Stack())
-	var trace = buf.String()
+	//var buf bytes.Buffer
+	//buf.Write(debug.Stack())
+	//var trace = buf.String()
 
-	fmt.Print(trace)
+	fmt.Println(GetCurrentNetworkFunctionUsingAPI())
 
 	if cfg.HTTPClient() != nil {
 		if CreateOpenSSLClientCtx(cfg) != nil {
 			return nil, fmt.Errorf("Error Creating OpenSSL Context in CallAPI()")
 		} else {
+			fmt.Println("using opensslctx")
 			return cfg.HTTPClient().Do(request)
 		}
 	}
 	if request.URL.Scheme == "https" {
+		fmt.Println("using inner")
 		return innerHTTP2Client.Do(request)
 	} else if request.URL.Scheme == "http" {
 		return innerHTTP2CleartextClient.Do(request)
