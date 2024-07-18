@@ -41,13 +41,15 @@ import (
 )
 
 var (
-	innerHTTP2Client = &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
-	}
+	innerOpenSSLClient    *http.Client
+	innerOpenSSLClientCtx *openssl.Ctx
+	//{
+	//	Transport: &http.Transport{
+	//		TLSClientConfig: &tls.Config{
+	//			InsecureSkipVerify: true,
+	//		},
+	//	},
+	//}
 
 	innerHTTP2CleartextClient = &http.Client{
 		Transport: &http2.Transport{
@@ -60,7 +62,7 @@ var (
 )
 
 func GetHttpsClient() *http.Client {
-	return innerHTTP2Client
+	return innerOpenSSLClient
 }
 func GetHttpClient() *http.Client {
 	return innerHTTP2CleartextClient
@@ -164,33 +166,61 @@ func GetCurrentNetworkFunctionUsingAPI() string {
 	return ""
 }
 
-func CreateOpenSSLClientCtx(cfg Configuration, nf string) error {
+func CreateOpenSSLClientCtx(nf string) *openssl.Ctx {
 	var err error
-	cert := "cert/"
-	pem := ".pem"
-	key := ".key"
 	var opensslContext *openssl.Ctx
 
-	opensslContext, err = openssl.NewCtxFromFiles(cert+nf+pem, cert+nf+key)
+	opensslContext, err = openssl.NewCtxFromFiles("cert/"+nf+".pem", "cert/"+nf+".key")
 	if err != nil {
-		return fmt.Errorf("could not set openssl ctx")
+		return nil
 	}
 
 	opensslContext.SetVerify(openssl.VerifyNone, nil)
-	cfg.SetOpenSSLCtx(opensslContext)
+	return opensslContext
+	//cfg.SetOpenSSLCtx(opensslContext)
 
-	//if err := cfg.tlsCtx.SetNextProtos([]string{"http/1.1"}); err != nil {
+	//if err := opensslContext.SetNextProtos([]string{"h2"}); err != nil {
 	//	fmt.Println("Failed to set Next Protos (ALPN)")
 	//	return nil
 	//}
+}
+
+func CreateOpenSSLInnerClientTransport() error {
+	// Custom dial function to use OpenSSL for TLS connections
+	dialTLS := func(network, addr string) (net.Conn, error) {
+		//cfg.tlsCtx.SetVerify(openssl.VerifyNone, nil)
+		conn, err := openssl.Dial(network, addr, innerOpenSSLClientCtx, openssl.InsecureSkipHostVerification)
+		if err != nil {
+			//fmt.Printf("Failed to establish TLS connection in CreateOpenSSLInnerClientTransport(): %v\n", err)
+			return nil, err
+		}
+		return conn, nil
+	}
+
+	// Create a custom transport using the custom dial function
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true, // Skip certificate verification,
+		},
+		TLSNextProto: make(map[string]func(authority string, c *tls.Conn) http.RoundTripper),
+		DialTLS:      dialTLS,
+	}
+
+	innerOpenSSLClient = &http.Client{Transport: tr}
+
+	return nil
+}
+
+func CreateOpenSSLClientTransportWithCfg(cfg Configuration, opensslContext *openssl.Ctx) error {
+	cfg.SetOpenSSLCtx(opensslContext)
 
 	// Custom dial function to use OpenSSL for TLS connections
 	dialTLS := func(network, addr string) (net.Conn, error) {
 		//cfg.tlsCtx.SetVerify(openssl.VerifyNone, nil)
 		conn, err := openssl.Dial(network, addr, cfg.HTTPClientOpenSSLCtx(), openssl.InsecureSkipHostVerification)
 		if err != nil {
-			fmt.Printf("Failed to establish TLS connection: %v\n", err)
-			return nil, nil
+			//fmt.Printf("Failed to establish TLS connection in CreateOpenSSLClientTransportWithCfg(): %v\n", err)
+			return nil, err
 		}
 		return conn, nil
 	}
@@ -212,25 +242,24 @@ func CreateOpenSSLClientCtx(cfg Configuration, nf string) error {
 
 // callAPI do the request.
 func CallAPI(cfg Configuration, request *http.Request) (*http.Response, error) {
-	//var buf bytes.Buffer
-	//buf.Write(debug.Stack())
-	//var trace = buf.String()
-
-	fmt.Println("***")
 	fmt.Println(GetCurrentNetworkFunctionUsingAPI())
-	fmt.Println("**")
+
+	opensslCtx := CreateOpenSSLClientCtx(GetCurrentNetworkFunctionUsingAPI())
+	if opensslCtx != nil {
+		return nil, fmt.Errorf("Error Creating OpenSSL Context")
+	}
 
 	if cfg.HTTPClient() != nil {
-		if CreateOpenSSLClientCtx(cfg, GetCurrentNetworkFunctionUsingAPI()) != nil {
-			return nil, fmt.Errorf("Error Creating OpenSSL Context in CallAPI()")
-		} else {
-			fmt.Println("using opensslctx")
-			return cfg.HTTPClient().Do(request)
-		}
+		CreateOpenSSLClientTransportWithCfg(cfg, opensslCtx)
+		return cfg.HTTPClient().Do(request)
 	}
+
 	if request.URL.Scheme == "https" {
-		fmt.Println("using inner")
-		return innerHTTP2Client.Do(request)
+		// Since the cfg.HTTPClient() was nil, we will create one using openssl
+		innerOpenSSLClientCtx = opensslCtx
+		CreateOpenSSLInnerClientTransport()
+		return innerOpenSSLClient.Do(request)
+
 	} else if request.URL.Scheme == "http" {
 		return innerHTTP2CleartextClient.Do(request)
 	}
